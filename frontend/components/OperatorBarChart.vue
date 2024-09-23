@@ -56,7 +56,7 @@ const createChart = () => {
           beginAtZero: true,
           ticks: {
             stepSize: 1,
-            callback: function(value) {
+            callback: function(value: number) {
               if (Math.floor(value) === value) {
                 return value;
               }

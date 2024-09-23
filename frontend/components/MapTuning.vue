@@ -18,7 +18,7 @@
       </span>
     </p>
     <div class="animation-controls">
-      <button @click="toggleAnimation">{{ isAnimating ? 'Pause' : 'Play' }}</button>
+      <Button @click="toggleAnimation" :label="isAnimating ? 'Pause' : 'Play'" />
       <input type="date" v-model="basinStore.currentDate" :min="basinStore.minDate" :max="basinStore.maxDate" @input="onDateChange">
       <span>{{ basinStore.currentDate }}</span>
     </div>
