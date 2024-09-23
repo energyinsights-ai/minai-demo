@@ -16,6 +16,8 @@
     "@pinia/nuxt": "^0.5.2",
     "@primevue/themes": "^4.0.1",
     "chart.js": "^4.4.4",
+    "chartjs-adapter-date-fns": "^3.0.0",
+    "date-fns": "^4.1.0",
     "nuxt": "^3.12.4",
     "pinia": "^2.2.2",
     "primevue": "^4.0.1",

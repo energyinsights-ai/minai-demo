@@ -2,6 +2,9 @@ import { defineStore } from 'pinia';
 import { ref, computed, watch } from 'vue';
 import L from 'leaflet';
 
+// Remove the Papa import
+// import Papa from 'papaparse';
+
 interface Rig {
   rig_id: string;
   lease_name: string;
@@ -20,6 +23,7 @@ export const useBasinStore = defineStore('basin', () => {
   const config = useRuntimeConfig();
   const wells = ref<any | null>(null);
   const filteredWellsByOperator = ref<any[]>([]);
+  const allData = ref<any[]>([]);
 
   const fetchGeoJson = async () => {
     const url = `${config.public.flaskBaseUrl}/api/geojson`;
@@ -38,6 +42,12 @@ export const useBasinStore = defineStore('basin', () => {
     const { data } = await useFetch(url);
     wells.value = data.value || [];
   }
+
+  const fetchAllData = async () => {
+    const url = `${config.public.flaskBaseUrl}/api/all_data`;
+    const { data } = await useFetch<any[]>(url);
+    allData.value = data.value || [];
+  };
 
   const operators = computed(() => {
     const uniqueOperators = [...new Set(rigs.value.map(rig => rig.operator))];
@@ -65,7 +75,7 @@ export const useBasinStore = defineStore('basin', () => {
     if (selectedOperator.value.operator === 'All') {
       filteredWellsByOperator.value = wells.value.features;
     } else {
-      filteredWellsByOperator.value = wells.value.features.filter(well => well.properties.operator === selectedOperator.value.operator);
+      filteredWellsByOperator.value = wells.value.features.filter((well: any) => well.properties.operator === selectedOperator.value.operator);
     }
   };
 
@@ -149,6 +159,18 @@ export const useBasinStore = defineStore('basin', () => {
     });
   };
 
+  const filteredAllData = computed(() => {
+    if (selectedOperator.value.operator === 'All') {
+      return allData.value;
+    }
+    return allData.value.filter(item => item.operator === selectedOperator.value.operator);
+  });
+
+  const plotData = computed(() => {
+    const currentTimestamp = new Date(currentDate.value).getTime();
+    return filteredAllData.value.filter(item => new Date(item.timestamp).getTime() <= currentTimestamp);
+  });
+
   return {
     geoJson,
     rigs,
@@ -166,6 +188,10 @@ export const useBasinStore = defineStore('basin', () => {
     createMarkers,
     fetchWells,
     wells,
-    visibleWells
+    visibleWells,
+    allData,
+    fetchAllData,
+    filteredAllData,
+    plotData
   };
 });

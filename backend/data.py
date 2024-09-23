@@ -23,3 +23,8 @@ class Data:
         with open('tr_json.json', 'r') as file:
             tr_json = json.load(file)
         return tr_json
+
+    def get_all_data(self):
+        df = pd.read_csv('all_data.csv')
+        
+        return df

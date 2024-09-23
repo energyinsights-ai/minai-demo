@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 from flask_cors import CORS
 import pandas as pd
-from data import Data
+from data import Data  # Make sure this import exists
 
 load_dotenv()
 app = Flask(__name__,static_folder='static')
@@ -34,7 +34,12 @@ def get_wells():
     well_json = data_instance.get_wells()
     return well_json
 
+@app.route('/api/all_data')
+def all_data():
+    data_instance = Data()
+    my_data = data_instance.get_all_data()
+    return jsonify(my_data.to_dict(orient='records'))
+
 if __name__ == '__main__':
     app.run(debug=True)
-    
-    
+
