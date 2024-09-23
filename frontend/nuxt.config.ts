@@ -32,7 +32,6 @@ export default defineNuxtConfig({
   compatibilityDate: '2024-04-03',
   modules: [
     '@primevue/nuxt-module',
-    "@nuxtjs/supabase",
     '@pinia/nuxt',
     "@nuxtjs/leaflet",
     "@nuxtjs/tailwindcss"
