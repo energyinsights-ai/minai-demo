@@ -19,8 +19,7 @@ def get_geojson():
     # Load the GeoJSON file
 
     data_instance = Data()
-    geojson_data = data_instance.get_map_layer('tr')
-    print(geojson_data)
+    geojson_data = data_instance.get_tr()
     return jsonify(geojson_data)
 
 @app.route('/api/get_rigs', methods=['GET'])
