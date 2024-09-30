@@ -1,5 +1,5 @@
 <template>
-  <div class="h-screen w-full overflow-hidden border border-red-500">
+  <div class="h-screen w-full overflow-hidden">
     <div class="flex h-full w-full">
       <div class="w-1/2 h-full flex">
         <BasinMap />
