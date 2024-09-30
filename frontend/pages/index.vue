@@ -1,12 +1,12 @@
 <template>
-  <div class="container">
-    <div class="content">
-      <div class="map-container">
+  <div class="h-screen w-full overflow-hidden border border-red-500">
+    <div class="flex h-full w-full">
+      <div class="w-1/2 h-full flex">
         <BasinMap />
       </div>
-      <div class="right-panel">
-        <div class="radius-selector">
-          <label for="radius-slider">Radius: {{ basinStore.radius }} miles</label>
+      <div class="w-1/2 h-full flex flex-col p-5">
+        <div class="mb-5">
+          <label for="radius-slider" class="block mb-1">Radius: {{ basinStore.radius }} miles</label>
           <input
             id="radius-slider"
             type="range"
@@ -15,13 +15,14 @@
             step="1"
             v-model.number="basinStore.radius"
             @change="handleRadiusChange"
+            class="w-full"
           />
         </div>
-        <div class="charts-container">
-          <div class="chart-wrapper">
+        <div class="flex-1 flex flex-col">
+          <div class="flex-1 mb-5">
             <AverageFootageChart />
           </div>
-          <div class="chart-wrapper">
+          <div class="flex-1">
             <SelectedSectionChart />
           </div>
         </div>
@@ -42,56 +43,3 @@ const handleRadiusChange = () => {
   basinStore.setRadius(basinStore.radius);
 };
 </script>
-
-<style scoped>
-.container {
-  height: 100vh;
-  width: 100vw;
-  overflow: hidden;
-}
-
-.content {
-  display: flex;
-  height: 100%;
-  width: 100%;
-}
-
-.map-container {
-  width: 50%;
-  height: 100%;
-  display: flex;  /* Add this line */
-}
-
-.right-panel {
-  width: 50%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  padding: 20px;
-  box-sizing: border-box;
-}
-
-.radius-selector {
-  margin-bottom: 20px;
-}
-
-.radius-selector label {
-  display: block;
-  margin-bottom: 5px;
-}
-
-.radius-selector input {
-  width: 100%;
-}
-
-.charts-container {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.chart-wrapper {
-  flex: 1;
-  margin-bottom: 20px;
-}
-</style>
