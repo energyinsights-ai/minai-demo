@@ -42,6 +42,9 @@ export default defineNuxtConfig({
       pathPrefix: false,
     },
   ],
+  plugins: [
+    '~/plugins/chart.js',
+  ],
   primevue: {
     options: {
         theme: {

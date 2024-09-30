@@ -1,197 +1,185 @@
 import { defineStore } from 'pinia';
-import { ref, computed, watch } from 'vue';
-import L from 'leaflet';
-
-// Remove the Papa import
-// import Papa from 'papaparse';
-
-interface Rig {
-  rig_id: string;
-  lease_name: string;
-  first_date: string;
-  last_date: string;
-  lat_mean: number;
-  lon_mean: number;
-  api_lst: string;
-  operator: string;
-}
+import { ref, computed } from 'vue';
+import { useRuntimeConfig } from '#app'
 
 export const useBasinStore = defineStore('basin', () => {
-  const geoJson = ref<any | null>(null);
-  const rigs = ref<Rig[]>([]);
-  const selectedOperator = ref({ operator: 'All' });
-  const config = useRuntimeConfig();
-  const wells = ref<any | null>(null);
-  const filteredWellsByOperator = ref<any[]>([]);
-  const allData = ref<any[]>([]);
+  const trsGeoJSON = ref(null);
+  const wellsGeoJSON = ref(null);
+  const radius = ref(5);
+  const config = useRuntimeConfig()
 
-  const fetchGeoJson = async () => {
-    const url = `${config.public.flaskBaseUrl}/api/geojson`;
-    const { data } = await useFetch(url);
-    geoJson.value = data.value;
-  };
+  const formationFootage = ref<{ [key: string]: number }>({});
+  const selectedTRSFootage = ref<{ [key: string]: number }>({});
+  const selectedSectionFootage = ref<{ [key: string]: { footage: number, well_count: number } }>({});
 
-  const fetchRigs = async () => {
-    const url = `${config.public.flaskBaseUrl}/api/get_rigs`;
-    const { data } = await useFetch<Rig[]>(url);
-    rigs.value = data.value || [];
-  };
-
-  const fetchWells = async() => {
-    const url = `${config.public.flaskBaseUrl}/api/get_wells`;
-    const { data } = await useFetch(url);
-    wells.value = data.value || [];
-  }
-
-  const fetchAllData = async () => {
-    const url = `${config.public.flaskBaseUrl}/api/all_data`;
-    const { data } = await useFetch<any[]>(url);
-    allData.value = data.value || [];
-  };
-
-  const operators = computed(() => {
-    const uniqueOperators = [...new Set(rigs.value.map(rig => rig.operator))];
-    return [{ operator: 'All' }, ...uniqueOperators.map(operator => ({ operator }))];
-  });
-
-  const filteredRigs = computed(() => {
-    if (!selectedOperator.value || selectedOperator.value.operator === 'All') {
-      return rigs.value;
+  const fetchTRSData = async () => {
+    try {
+      const url = `${config.public.flaskBaseUrl}/api/trs?radius=${radius.value}`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      console.log('Raw TRS data:', data);
+      trsGeoJSON.value = data;
+      calculateAverageFormationFootage(data);
+      setSelectedTRSFootage(data);  // Make sure this line is present
+      setSelectedSectionFootage(data);
+    } catch (error) {
+      console.error('Error fetching TRS data:', error);
+      formationFootage.value = {};
+      selectedTRSFootage.value = {};
+      selectedSectionFootage.value = {};
     }
-    return rigs.value.filter(rig => rig.operator === selectedOperator.value.operator);
-  });
+  };
 
-  const setSelectedOperator = (operator: string | { operator: string }) => {
-    if (typeof operator === 'string') {
-      selectedOperator.value = operator === 'All' ? { operator: 'All' } : { operator };
+  const calculateAverageFormationFootage = (data: any) => {
+    if (!data || !data.features || data.features.length === 0) {
+      console.error('No features in data');
+      formationFootage.value = {};
+      return;
+    }
+
+    const feature = data.features[0];
+    const avgIntervalFootages = feature.properties?.avg_interval_footages || {};
+    
+    const footageByFormation: { [key: string]: number } = {};
+    Object.entries(avgIntervalFootages).forEach(([interval, data]: [string, any]) => {
+      footageByFormation[interval] = Number(data.footage);
+    });
+
+    console.log('Final average footage by formation:', footageByFormation);
+    formationFootage.value = footageByFormation;
+  };
+
+  const setSelectedTRSFootage = (data: any) => {
+    const selectedTRS = data.features.find((f: any) => f.properties.trs === '14-04N-65W');
+    if (selectedTRS) {
+      const footages = selectedTRS.properties.interval_footages || {};
+      selectedTRSFootage.value = Object.entries(footages).reduce((acc, [interval, data]: [string, any]) => {
+        acc[interval] = Number(data.footage);
+        return acc;
+      }, {} as { [key: string]: number });
     } else {
-      selectedOperator.value = operator;
+      console.warn('Selected TRS not found');
+      selectedTRSFootage.value = {};
     }
-    filterWellsByOperator();
-    resetTuning();
+    console.log('Final selected TRS footage:', selectedTRSFootage.value);
   };
 
-  const filterWellsByOperator = () => {
-    if (selectedOperator.value.operator === 'All') {
-      filteredWellsByOperator.value = wells.value.features;
+  const setSelectedSectionFootage = (data: any) => {
+    const selectedSection = data.features.find((f: any) => f.properties.trs === '14-04N-65W');
+    if (selectedSection) {
+      const footages = selectedSection.properties.interval_footages || {};
+      selectedSectionFootage.value = Object.entries(footages).reduce((acc, [interval, data]: [string, any]) => {
+        acc[interval] = {
+          footage: Number(data.footage),
+          well_count: Number(data.well_count)
+        };
+        return acc;
+      }, {} as { [key: string]: { footage: number, well_count: number } });
     } else {
-      filteredWellsByOperator.value = wells.value.features.filter((well: any) => well.properties.operator === selectedOperator.value.operator);
+      console.warn('Selected section not found');
+      selectedSectionFootage.value = {};
+    }
+    console.log('Final selected section footage:', selectedSectionFootage.value);
+  };
+
+  const fetchWellsData = async () => {
+    try {
+      const url = `${config.public.flaskBaseUrl}/api/wells?radius=${radius.value}`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      wellsGeoJSON.value = data;
+    } catch (error) {
+      console.error('Error fetching Wells data:', error);
     }
   };
 
-  const minDate = computed(() => {
-    const dates = filteredRigs.value.map(rig => rig.first_date);
-    if (filteredWellsByOperator.value.length > 0) {
-      dates.push(...filteredWellsByOperator.value.map(well => well.properties.permit_approved_date));
-    }
-    const minDate = dates.reduce((min, date) => date < min ? date : min, dates[0] || '');
-    return minDate < '2022-01-01' ? '2022-01-01' : minDate;
-  });
-
-  const maxDate = computed(() => {
-    const dates = filteredRigs.value.map(rig => rig.last_date);
-    if (filteredWellsByOperator.value.length > 0) {
-      dates.push(...filteredWellsByOperator.value.map(well => well.properties.spud_date));
-    }
-    return dates.reduce((max, date) => date > max ? date : max, dates[0] || '');
-  });
-
-  const currentDate = ref('');
-
-  const setCurrentDate = (date: string) => {
-    const newDate = new Date(date);
-    currentDate.value = newDate.toISOString().split('T')[0];
+  const setRadius = async (value: number) => {
+    radius.value = value;
+    await Promise.all([fetchTRSData(), fetchWellsData()]);
   };
 
-  const resetTuning = () => {
-    setCurrentDate(minDate.value);
-  };
+  const averageFootageChartData = computed(() => ({
+    labels: Object.keys(formationFootage.value),
+    datasets: [{
+      label: 'Average Footage by Formation',
+      data: Object.values(formationFootage.value),
+      backgroundColor: 'rgba(75, 192, 192, 0.6)',
+      borderColor: 'rgba(75, 192, 192, 1)',
+      borderWidth: 1
+    }]
+  }));
 
-  watch(rigs, (newRigs) => {
-    if (newRigs.length > 0 && !currentDate.value) {
-      setCurrentDate(minDate.value);
-    }
-  });
+  const selectedFormationChartData = computed(() => ({
+    labels: Object.keys(selectedTRSFootage.value),
+    datasets: [{
+      label: 'Total Footage by Interval for Selected Formation',
+      data: Object.values(selectedTRSFootage.value),
+      backgroundColor: 'rgba(54, 162, 235, 0.6)',
+      borderColor: 'rgba(54, 162, 235, 1)',
+      borderWidth: 1
+    }]
+  }));
 
-  const visibleRigs = computed(() => {
-    return filteredRigs.value.filter(rig => 
-      rig.first_date <= currentDate.value && rig.last_date >= currentDate.value
-    );
-  });
+  const selectedSectionChartData = computed(() => {
+    const labels = Array.from(new Set([...Object.keys(formationFootage.value), ...Object.keys(selectedSectionFootage.value)]));
+    
+    const differences = labels.map(label => {
+      const selectedWellCount = selectedSectionFootage.value[label]?.well_count || 0;
+      const avgFootage = formationFootage.value[label] || 0;
+      const avgWellCount = avgFootage / 5000;
+      
+      let diff: number;
+      if (selectedSectionFootage.value[label]) {
+        diff = selectedWellCount - avgWellCount;
+      } else {
+        // If the section doesn't have this formation, use the average footage
+        diff = avgWellCount;
+      }
+      
+      // Apply the rounding rules
+      if (diff < 0) {
+        diff = 0;
+      } else if (diff < 0.5) {
+        diff = 0;
+      } else {
+        diff = Math.round(diff);
+      }
+      
+      return diff;
+    });
 
-  const visibleWells = computed(() => {
-    if (selectedOperator.value.operator === 'All') {
-      return [];
-    }
-    const current = new Date(currentDate.value);
-    const currentMonth = current.getMonth();
-    const currentYear = current.getFullYear();
-    const filteredWells = filteredWellsByOperator.value.filter(well => {
-      return well.properties.data.some((entry: any) => {
-        const timestamp = new Date(entry.timestamp);
-        return timestamp.getMonth() === currentMonth && timestamp.getFullYear() === currentYear;
-      });
-    }).map(well => {
-      const colorEntry = well.properties.data.find((entry: any) => {
-        const timestamp = new Date(entry.timestamp);
-        return timestamp.getMonth() === currentMonth && timestamp.getFullYear() === currentYear;
-      });
-      return {
-        ...well,
-        properties: {
-          ...well.properties,
-          color: colorEntry ? colorEntry.color : 'gray' // Default color if no match found
+    return {
+      labels,
+      datasets: [
+        {
+          label: 'Additional Wells Needed',
+          data: differences,
+          backgroundColor: 'rgba(75, 192, 192, 0.6)',
+          borderColor: 'rgba(75, 192, 192, 1)',
+          borderWidth: 1
         }
-      };
-    });
-    return filteredWells;
-  });
-
-  const createMarkers = () => {
-    return visibleRigs.value.map(rig => {
-      const marker = L.marker([rig.lat_mean, rig.lon_mean]);
-      marker.bindTooltip(rig.operator, {
-        permanent: false,
-        direction: 'top',
-        opacity: 0.7
-      });
-      return marker;
-    });
-  };
-
-  const filteredAllData = computed(() => {
-    if (selectedOperator.value.operator === 'All') {
-      return allData.value;
-    }
-    return allData.value.filter(item => item.operator === selectedOperator.value.operator);
-  });
-
-  const plotData = computed(() => {
-    const currentTimestamp = new Date(currentDate.value).getTime();
-    return filteredAllData.value.filter(item => new Date(item.timestamp).getTime() <= currentTimestamp);
+      ]
+    };
   });
 
   return {
-    geoJson,
-    rigs,
-    operators,
-    selectedOperator,
-    filteredRigs,
-    fetchGeoJson,
-    fetchRigs,
-    setSelectedOperator,
-    minDate,
-    maxDate,
-    currentDate,
-    setCurrentDate,
-    visibleRigs,
-    createMarkers,
-    fetchWells,
-    wells,
-    visibleWells,
-    allData,
-    fetchAllData,
-    filteredAllData,
-    plotData
+    trsGeoJSON,
+    wellsGeoJSON,
+    radius,
+    formationFootage,
+    selectedTRSFootage,
+    selectedSectionFootage,
+    fetchTRSData,
+    fetchWellsData,
+    setRadius,
+    averageFootageChartData,
+    selectedFormationChartData,
+    selectedSectionChartData,  // Add this line back
   };
 });
